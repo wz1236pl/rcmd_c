@@ -19,13 +19,13 @@ int main() {
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
-        perror("Error opening socket");
+        perror("Błąd przy otwieraniu socketu");
         exit(1);
     }
 
     server = gethostbyname("localhost");
     if (server == NULL) {
-        perror("Error: no such host");
+        perror("Error: Nie ma takiego hosta");
         exit(1);
     }
 
@@ -36,19 +36,19 @@ int main() {
     serv_addr.sin_port = htons(PORT);
 
     if (connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
-        perror("Error connecting");
+        perror("Błąd nawiązania połączenia (connect)!");
         exit(1);
     }
 
-    printf("Connected to server\n");
+    printf("Pomyślnie zawiązano połączenie\n");
 
     memset(buffer, 0, BUFFER_SIZE);
-    printf("Enter the command to execute: ");
+    printf("Wpisz polecenie: ");
     fgets(buffer, BUFFER_SIZE - 1, stdin);
 
     n = write(sockfd, buffer, strlen(buffer));
     if (n < 0) {
-        perror("Error writing to socket");
+        perror("Błąd odczytu z socketu");
         exit(1);
     }
 
@@ -59,7 +59,7 @@ int main() {
         exit(1);
     }
 
-    printf("Command output:\n%s", buffer);
+    printf("Odpowiedź z serwera:\n%s", buffer);
 
     close(sockfd);
     return 0;

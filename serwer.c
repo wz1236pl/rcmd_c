@@ -5,57 +5,37 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
-#include <pthread.h>
 
 #define PORT 9000
 #define BUFFER_SIZE 1024
 
-void* handle_client(void* arg) {
-    int sockfd = *((int*)arg);
-    struct sockaddr_in client_addr;
-    socklen_t client_len = sizeof(client_addr);
+int execute_command(char* command, char* output) {
+    FILE* fp;
+    char line[BUFFER_SIZE];
+    char* result = output;
 
-    char buffer[BUFFER_SIZE];
-    memset(buffer, 0, BUFFER_SIZE);
-
-    ssize_t n = recvfrom(sockfd, buffer, BUFFER_SIZE - 1, 0, (struct sockaddr*)&client_addr, &client_len);
-    if (n < 0) {
-        perror("Error reading from socket");
-        close(sockfd);
-        pthread_exit(NULL);
-    }
-
-    char output[BUFFER_SIZE];
-    memset(output, 0, BUFFER_SIZE);
-    // Wykonaj polecenie i zapisz wynik do zmiennej output
-
-    // Przykład: Wykonaj polecenie w powłoce systemowej
-    FILE* fp = popen(buffer, "r");
+    fp = popen(command, "r");
     if (fp == NULL) {
-        perror("Error executing command");
-        close(sockfd);
-        pthread_exit(NULL);
+        return -1;
     }
 
-    while (fgets(output, BUFFER_SIZE, fp) != NULL) {
-        sendto(sockfd, output, strlen(output), 0, (struct sockaddr*)&client_addr, client_len);
-        memset(output, 0, BUFFER_SIZE);
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        strcat(result, line);
     }
 
     pclose(fp);
-
-    close(sockfd);
-    pthread_exit(NULL);
+    return 0;
 }
 
 int main() {
-    int sockfd;
-    struct sockaddr_in serv_addr;
+    int sockfd, newsockfd;
+    socklen_t clilen;
+    char buffer[BUFFER_SIZE];
+    struct sockaddr_in serv_addr, cli_addr;
+    int n;
 
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
-        perror("Error opening socket");
+    if ( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("Błąd przy otwieraniu socketu");
         exit(1);
     }
 
@@ -66,27 +46,43 @@ int main() {
     serv_addr.sin_port = htons(PORT);
 
     if (bind(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
-        perror("Error on binding");
+        perror("Błąd nawiązania połączenia (bind)!");
         exit(1);
     }
 
-    printf("Server listening on port %d...\n", PORT);
+    listen(sockfd, 5);
+    clilen = sizeof(cli_addr);
 
-    pthread_t tid;
+    printf("Serwer nasłuchuje portu %d...\n", PORT);
 
     while (1) {
-        int newsockfd;
-        struct sockaddr_in client_addr;
-        socklen_t client_len = sizeof(client_addr);
-
-        newsockfd = accept(sockfd, (struct sockaddr*)&client_addr, &client_len);
+        newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
         if (newsockfd < 0) {
-            perror("Error on accept");
+            perror("Błąd nawiązania połączenia (accept)!");
             exit(1);
         }
 
-        pthread_create(&tid, NULL, handle_client, (void*)&newsockfd);
-        pthread_detach(tid);
+        printf("Nawiązano połaączenie\n");
+
+        memset(buffer, 0, BUFFER_SIZE);
+        n = read(newsockfd, buffer, BUFFER_SIZE - 1);
+        if (n < 0) {
+            perror("Błąd odczytu z socketu");
+            exit(1);
+        }
+
+        char output[BUFFER_SIZE];
+        memset(output, 0, BUFFER_SIZE);
+        execute_command(buffer, output);
+
+        n = write(newsockfd, output, strlen(output));
+        if (n < 0) {
+            perror("Błąd zapisu do socketu");
+            exit(1);
+        }
+
+        close(newsockfd);
+        printf("Polecenie wykonane, wysyłanie odpowiedzi!\n");
     }
 
     close(sockfd);
