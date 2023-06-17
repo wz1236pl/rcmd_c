@@ -28,13 +28,13 @@ int execute_command(char* command, char* output) {
 }
 
 int main() {
-    int sockfd, newsockfd;
-    socklen_t clilen;
+    int sockfd;
     char buffer[BUFFER_SIZE];
     struct sockaddr_in serv_addr, cli_addr;
+    socklen_t cli_addr_len;
     int n;
 
-    if ( (sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("Błąd przy otwieraniu socketu");
         exit(1);
     }
@@ -50,38 +50,29 @@ int main() {
         exit(1);
     }
 
-    listen(sockfd, 5);
-    clilen = sizeof(cli_addr);
-
     printf("Serwer nasłuchuje portu %d...\n", PORT);
 
     while (1) {
-        newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen);
-        if (newsockfd < 0) {
-            perror("Błąd nawiązania połączenia (accept)!");
-            exit(1);
-        }
-
-        printf("Nawiązano połaączenie\n");
-
         memset(buffer, 0, BUFFER_SIZE);
-        n = read(newsockfd, buffer, BUFFER_SIZE - 1);
+        cli_addr_len = sizeof(cli_addr);
+        n = recvfrom(sockfd, buffer, BUFFER_SIZE - 1, 0, (struct sockaddr*)&cli_addr, &cli_addr_len);
         if (n < 0) {
             perror("Błąd odczytu z socketu");
             exit(1);
         }
 
+        printf("Nawiązano połączenie\n");
+
         char output[BUFFER_SIZE];
         memset(output, 0, BUFFER_SIZE);
         execute_command(buffer, output);
 
-        n = write(newsockfd, output, strlen(output));
+        n = sendto(sockfd, output, strlen(output), 0, (struct sockaddr*)&cli_addr, sizeof(cli_addr));
         if (n < 0) {
             perror("Błąd zapisu do socketu");
             exit(1);
         }
 
-        close(newsockfd);
         printf("Polecenie wykonane, wysyłanie odpowiedzi!\n");
     }
 
