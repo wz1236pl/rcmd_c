@@ -71,6 +71,7 @@ int main() {
     }
     fwrite(buffer, sizeof(char), sizeof(buffer), file);
     fclose(file);
+    printf("Zapisano do pliku:\n");
 
     close(sockfd);
     return 0;
